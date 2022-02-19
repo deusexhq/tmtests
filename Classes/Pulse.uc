@@ -11,18 +11,18 @@ function Tick(float deltatime){
 }
 
 simulated function RenderOverlays(canvas Canvas){
-	local DeusExPlayer  P;
-    local float         Scale;
+     local DeusExPlayer  P;
+     local float         Scale;
 
-	Super.RenderOverlays(Canvas);
-	P = DeusExPlayer(Owner);
+     Super.RenderOverlays(Canvas);
+     P = DeusExPlayer(Owner);
 
-    Scale = Canvas.ClipX/640;
-    Canvas.SetPos(0.5 * Canvas.ClipX - 16 * Scale, 0.5 * Canvas.ClipY - 16 * Scale );
-    Canvas.DrawColor.R = 200;
-    Canvas.DrawColor.G = 200;
-    Canvas.DrawColor.B = 200;
-    Canvas.Font = Canvas.SmallFont;
+     Scale = Canvas.ClipX/640;
+     Canvas.SetPos(0.5 * Canvas.ClipX - 16 * Scale, 0.5 * Canvas.ClipY - 16 * Scale );
+     Canvas.DrawColor.R = 200;
+     Canvas.DrawColor.G = 200;
+     Canvas.DrawColor.B = 200;
+     Canvas.Font = Canvas.SmallFont;
 
      if(cooldown > 0.0)
           Canvas.DrawText("        > "$cooldown$"_");
@@ -38,26 +38,30 @@ simulated function PreBeginPlay(){
 }
 
 function Pulsar(){
-     local HackableDevices hd; //HackAction(Player, True); exclude securitycamera
-     local Lamp l; //if(bOn)
+     local Keypad hd; 
+     local Lamp l; 
      local SecurityCamera sc;
-     local Autoturret at; //UnTrigger(Player, Player);
-     local Robot bot; //TakeDamageBase(1000, Player, bot.location, player.location, 'EMP', true)
+     local Autoturret at; 
+     local Robot bot; 
      local DeusExMover mv, m;
      local DeusExPlayer player;
 
      player = DeusExPlayer(owner);
 
-     foreach player.RadiusActors(class'HackableDevices', hd, maxRange){
-          if(!hd.isA('SecurityCamera')) HackAction(Player, True);
+     ExploFX();
+     
+     foreach player.RadiusActors(class'Keypad', hd, maxRange){
+          hd.ToggleLocks(Player);
+          hd.RunEvents(Player,True);
+          hd.RunUntriggers(Player);
      }
 
      foreach player.RadiusActors(class'Lamp', l, maxRange){
-          if (bOn) {
-               bOn = False;
-               LightType = LT_None;
-               bUnlit = False;
-               ResetScaleGlow();
+          if (l.bOn) {
+               l.bOn = False;
+               l.LightType = LT_None;
+               l.bUnlit = False;
+               l.ResetScaleGlow();
           }
      }
 
@@ -70,7 +74,7 @@ function Pulsar(){
      }
 
      foreach player.RadiusActors(class'Robot', bot, maxRange){
-          TakeDamageBase(1000, Player, bot.location, player.location, 'EMP', true);
+          bot.TakeDamageBase(1000, Player, bot.location, player.location, 'EMP', true);
      }
 
      foreach player.RadiusActors(class'DeusExMover', mv, maxRange){
@@ -103,7 +107,7 @@ function ExploFX(){
 	//S3.Lifespan = 2.5;
 
     sphere = Spawn(class'TMTSphere',,, owner.location);
-    sphere.size = shoutRadius;
+    sphere.size = maxRange;
 
 }
 
