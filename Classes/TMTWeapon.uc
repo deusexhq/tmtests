@@ -287,8 +287,8 @@ function ExecShout(){
 
     if(hitpawn != None && isTaunt(hitpawn)){
         player.flagBase.setBool('target_shouted', True, True);
-        //INSERT CONVO STUFF HERE
-        player.StartConversationByName('gunpoint', hitpawn);
+        //player.StartConversationByName(Name(hitpawn.BindName$"gunpoint"), hitpawn);
+        hitpawn.Frob(Player, Player.InHand);
         return;
     }
 
