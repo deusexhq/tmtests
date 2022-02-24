@@ -1,11 +1,28 @@
 class TMTWeapon extends DeusExWeapon;
 
+#exec TEXTURE IMPORT NAME="isightglock" FILE="Textures\pistol_sight.bmp" GROUP="Skins" FLAGS=2
+#exec TEXTURE IMPORT NAME="isightglock2" FILE="Textures\pistol_sight2.pcx" GROUP="Skins" FLAGS=2
+
 var() float shoutRadius, tauntTimeout;
 var ScriptedPawn Taunts[16];
 var float TauntTimeouts[16];
 var string TauntInfo[16];
 var ScriptedPawn lastLookedAt;
 var() float Cooldown, CooldownTime;
+var bool bIronSightsOn;
+
+function IronSightsOn(){
+    bIronSightsOn = True;
+}
+
+function IronSightsOff(){
+    bIronSightsOn = False;
+}
+
+function ToggleIronSights(){
+    if(bIronSightsOn) IronSightsOff();
+    else IronSightsOn();
+}
 
 function MutTM WorldMutator(){
     local MutTM M;
@@ -17,6 +34,17 @@ simulated function RenderOverlays(canvas Canvas){
     local DeusExPlayer P;
     local float Scale;
     local int y, i;
+	local float			fromX, toX;
+	local float			fromY, toY;
+	local float			scopeWidth, scopeHeight;
+    
+    scopeWidth  = 256;
+	scopeHeight = 256;
+
+	fromX = (512-scopeWidth)/2;
+	fromY = (512-scopeHeight)/2;
+	toX   = fromX + scopeWidth;
+	toY   = fromY + scopeHeight;
 
     Super.RenderOverlays(Canvas);
     P = DeusExPlayer(Owner);
@@ -39,6 +67,10 @@ simulated function RenderOverlays(canvas Canvas){
                 Canvas.DrawText("        > "$Taunts[i].FamiliarName$" ("$TauntInfo[i]$"): "$TauntTimeouts[i]$"_");
             y += 20;
         }
+    }
+
+    if(bIronSightsOn){
+		Canvas.DrawPattern(Texture'isightglock', 0.5 * Canvas.ClipX - 16 * Scale, 0.5 * Canvas.ClipY - 16 * Scale, Scale);
     }
 }
 
@@ -170,7 +202,7 @@ function Tick(float dt){
 
     if(cooldown > 0.0) cooldown -= dt;
 
-    player = DeusExPlayer(Owner);
+    player         = DeusExPlayer(Owner);
     // Tracing and finding target
     position       = player.Location;
     position.Z     += player.BaseEyeHeight;
@@ -237,6 +269,28 @@ function Shout(ScriptedPawn Target){
 
 function ExecShout(){
     local ScriptedPawn ps;
+
+    local DeusExPlayer  player;
+    local scriptedpawn  hitpawn;
+    local Actor         hitActor;
+    local Vector        hitLocation, hitNormal, position, line;
+    local float         dist;
+    local int i;
+
+    player         = DeusExPlayer(Owner);
+    // Tracing and finding target
+    position       = player.Location;
+    position.Z     += player.BaseEyeHeight;
+    line           = Vector(player.ViewRotation) * 4000;
+    hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+    hitpawn        = ScriptedPawn(hitactor);
+
+    if(hitpawn != None && isTaunt(hitpawn)){
+        player.flagBase.setBool('target_shouted', True, True);
+        //INSERT CONVO STUFF HERE
+        player.StartConversationByName('gunpoint', hitpawn);
+        return;
+    }
 
     if(cooldown > 0.0) return;
     cooldown = cooldowntime;

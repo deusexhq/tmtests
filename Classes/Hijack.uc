@@ -31,7 +31,7 @@ simulated function RenderOverlays(canvas Canvas){
 }
 
 function DropFrom(vector StartLocation){
-	if(bJacked) { GotoState('Activated'); StartLocation = Owner.location; }
+	if(bJacked) { GotoState('Activated'); StartLocation = host.location; }
      super.DropFrom(StartLocation);
 }
 
@@ -102,11 +102,16 @@ function switchGlobalAlliances(){
 // grabSkin
 // takes the skin from Source and applies it to Target
 function grabSkin(pawn Source, pawn Target){
+     //local vector l;
+     //l = Target.Location;
+     //l.z += int(Self.Default.CollisionHeight);
+     //Target.SetLocation(l);
      Target.Mesh = Source.Mesh;
      Target.Drawscale = Source.Drawscale;
      Target.Fatness = Source.Fatness;
-     Target.SetCollisionSize(Source.CollisionRadius, Source.CollisionHeight);
-     Target.BaseEyeHeight = Target.BaseEyeHeight;
+     //Target.SetCollisionSize(Source.CollisionRadius, Source.CollisionHeight);
+
+     //Target.BaseEyeHeight = Source.BaseEyeHeight;
      Target.Skin = Source.Skin;
      Target.Texture = Source.Texture;
      Target.bMeshEnviroMap = Source.bMeshEnviroMap;
@@ -160,8 +165,8 @@ state Activated
                if(bJacked){
                     // Effects
                     player.ClientFlash(2, vect(0,255,0));
-                    player.Sprite = None;
-                    player.ConsoleCommand("RMODE 5");
+                    //player.Sprite = None;
+                    //player.ConsoleCommand("RMODE 5");
                     jackedPawn.bHidden = False;
 
                     // Copy player's skin back to the jacked pawn
@@ -200,11 +205,11 @@ state Activated
                     hitpawn        = ScriptedPawn(hitactor);
 
                     // Pawn found and within range
-			     if(hitpawn != None && dist < distLimit) {
+			     if(hitpawn != None && dist < distLimit && !hitpawn.isA('Animal') && !hitpawn.isA('Robot')) {
                          // Effects and generic setup
                          player.ClientFlash(2, vect(0,255,0));
-                         player.Sprite = Texture(DynamicLoadObject("Extras.Matrix_A00", class'Texture'));
-                         player.ConsoleCommand("RMODE 6");
+                         //player.Sprite=Texture(DynamicLoadObject("Extras.Matrix_A00",class'Texture'));
+                         //player.ConsoleCommand("RMODE 6");
                          jackedPawn = hitpawn;
                          bJacked = True;
                          jackTime = 0.0;
@@ -245,7 +250,6 @@ state Activated
                               switchGlobalAlliances();
                               bSwitchedAlliance = True; 
                          }
-                         
                     }
                }
 

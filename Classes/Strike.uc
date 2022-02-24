@@ -1,8 +1,17 @@
 class Strike extends DeusExPickup;
 
+/*
+Var for wether to use homing drone
+Var for wether to allow targetting NPC's
+Allow for targetting terrain
+Add ground shake for player when rocket hits if within a var range
+Sound effects for when drone fires
+
+ */
 var() int maxRange, Ammo, maxAmmo;
 var() Marker MyMarker; 
 var() float CountdownToFire, FiresIn;
+var() bool bCanTargetTerrain, bCanTargetNPC;
 var bool bWaitingToFire;
 var Pawn Target;
 
@@ -95,7 +104,7 @@ state Activated
             return;
         }
 
-        if(hitpawn != None && dist < maxRange){
+        if(hitpawn != None && dist < maxRange && bCanTargetNPC){
             Target = hitpawn;
             player.ClientMessage("Target found. Preparing.");
             CountdownToFire = FiresIn;
@@ -124,6 +133,8 @@ function FireOnTarget(){
 
 defaultproperties
 {
+     bCanTargetNPC=True
+     bCanTargetTerrain=True
      maxAmmo=1000
      Ammo=1000
      maxRange=1024

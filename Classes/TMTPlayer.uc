@@ -1,17 +1,112 @@
 class TMTPlayer extends JCDentonMale;
-var bool bAlreadyJumped;
-var int MantleVelocity;
+
+var bool bAlreadyJumped, IsMantling, bDisableFallDamage;
+var int MantleVelocity, WallJumpCheck, FallDamageReduction;
 var float WallJumpVelocity, DoubleJumpMultiplier, WallJumpZVelocity;
-var int WallJumpCheck;
-var bool IsMantling;
-var int FallDamageReduction;
-var bool bDisableFallDamage;
+
+//
+// Commands
+//
 
 exec function tmt(){
     ClientMessage("Test!");
 }
 
+exec function msgr(string text){
+	ShowMessage(text);
+}
 
+exec function bark(string text){
+	CreateBark(self, text, 5.0);
+}
+
+exec function toggleironsights(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.ToggleIronSights();
+	}
+}
+exec function ironsightsoff(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.IronSightsOff();
+	}
+}
+
+exec function ironsightson(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.IronSightsOn();
+	}
+}
+
+exec function shout(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.ExecShout();
+	}
+}
+
+exec function takedown(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.Takedown();
+	}
+}
+
+exec function giveorder(){
+	local TMTWeapon T;
+	if(InHand.IsA('TMTWeapon')){
+		T = TMTWeapon(InHand);
+		T.OrderTarget();
+	}
+}
+
+// 
+// Custom
+//
+
+simulated function ShowMessage(string Message){
+    local HUDMissionStartTextDisplay    HUD;
+
+    if ((RootWindow != None) && (DeusExRootWindow(RootWindow).HUD != None)) {
+        HUD = DeusExRootWindow(RootWindow).HUD.startDisplay;
+    }
+
+    if(HUD != None) {
+        HUD.shadowDist = 0;
+        //HUD.setFont(Font'FontMenuTitle');
+        HUD.fontText = Font'FontMenuExtraLarge';
+        HUD.Message = "";
+        HUD.charIndex = 0;
+        HUD.winText.SetText("");
+        HUD.winTextShadow.SetText("");
+        HUD.displayTime = 5.50;
+        HUD.perCharDelay = 0.01;
+        HUD.AddMessage(Message);
+        HUD.StartMessage();
+    }
+}
+
+simulated final function createBark(Actor BotSender, string msg, float Delay){
+	local DeusExRootWindow _root;
+
+	_root = DeusExRootWindow(rootWindow);
+	if(_root != None){
+		_root.hud.barkdisplay.addBark(msg, Delay, BotSender);
+	}
+
+}
+
+
+//
+// Overrides
+//
 
 function DoJump( optional float F ){
 	local DeusExWeapon w;
@@ -140,14 +235,13 @@ function Landed(vector HitNormal){
 						augReduce = 15 * (augLevel+1);
 				}
 
-				//Calculate the zyme effect
-				if(drugEffectTimer < 0) //(FindInventoryType(Class'DeusEx.ZymeCharged') != None)
+				if(drugEffectTimer < 0) 
 					augReduce += 10;
 
 				dmg = Max((-0.16 * (Velocity.Z + 700)) - augReduce, 0);
 				if(FallDamageReduction > 0)
 					dmg = dmg / FallDamageReduction;
-				legLocation = Location + vect(-1,0,-1);			// damage left leg
+				legLocation = Location + vect(-1,0,-1);
 				if(dmg > 0 && !bDisableFallDamage) //Kaiz0r - Adding code for disabling fall damage
 					TakeDamage(dmg, None, legLocation, vect(0,0,0), 'fell');
 
