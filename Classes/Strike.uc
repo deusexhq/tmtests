@@ -14,6 +14,7 @@ var() float CountdownToFire, FiresIn;
 var() bool bCanTargetTerrain, bCanTargetNPC;
 var bool bWaitingToFire;
 var Pawn Target;
+var Vector TargetLocation;
 
 function Tick(float deltatime){
     super.Tick(deltatime);
@@ -104,6 +105,9 @@ state Activated
             return;
         }
 
+        if(hitpawn == None && dist < maxRange && bCanTargetTerrain){
+
+        }
         if(hitpawn != None && dist < maxRange && bCanTargetNPC){
             Target = hitpawn;
             player.ClientMessage("Target found. Preparing.");
@@ -115,6 +119,18 @@ state Activated
 		GotoState('DeActivated');
 	}
 Begin:
+}
+
+function FireOnLoc(){
+    local rotator            launchRot;
+    local DeusExProjectile   rd;
+
+    DeusExPlayer(Owner).ClientMessage("Launched missile.");
+
+    launchRot = Rotator(TargetLocation - MyMarker.Location);  
+    rd = Spawn(MyMarker.StrikeProjectileClass, DeusExPlayer(Owner),,MyMarker.Location,launchRot);
+    
+    Ammo -= 1;
 }
 
 function FireOnTarget(){

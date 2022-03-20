@@ -3,11 +3,45 @@ class TMTPlayer extends JCDentonMale;
 var bool bAlreadyJumped, IsMantling, bDisableFallDamage;
 var int MantleVelocity, WallJumpCheck, FallDamageReduction;
 var float WallJumpVelocity, DoubleJumpMultiplier, WallJumpZVelocity;
+//var TMHUD extHUD;
+//
+
+
+/*event Possess(){
+    local DeusExRootWindow w;
+
+    Super.Possess();
+
+    w = DeusExRootWindow(RootWindow);
+   	if (w != None)
+	{
+	    if (w.hud != None){
+			w.hud.Destroy();
+		}
+		w.hud = TMHUD(w.NewChild(Class'TMHUD'));
+		extHUD = TMHUD(w.hud);
+		w.hud.UpdateSettings(self);
+		w.hud.SetWindowAlignments(HALIGN_Full,VALIGN_Full,0.00,0.00);
+		
+	}
+
+}*/
 
 //
 // Commands
 //
-
+exec function pp(){
+	ClientMessage(DeusExWeapon(inHand).PlayerViewOffset);
+}
+exec function px(float x){
+	DeusExWeapon(inHand).PlayerViewOffset.X=x;
+}
+exec function py(float y){
+    DeusExWeapon(inHand).PlayerViewOffset.Y=y;
+}
+exec function pz(float z){
+    DeusExWeapon(inHand).PlayerViewOffset.Z=z;
+}
 exec function tmt(){
     ClientMessage("Test!");
 }
@@ -173,6 +207,16 @@ function DoJump( optional float F ){
 		if ( bCountJumps && (Role == ROLE_Authority) )
 			Inventory.OwnerJumped();
 	}
+}
+
+function float GetCurrentGroundSpeed(){
+	local float speed;
+
+	speed = super.GetCurrentGroundSpeed();
+	if(TMTWeapon(inHand) != None && TMTWeapon(inHand).bIronSightsOn){
+		speed /= 5;
+	}
+	return speed;
 }
 
 state PlayerWalking

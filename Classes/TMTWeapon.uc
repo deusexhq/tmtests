@@ -12,16 +12,58 @@ var() float Cooldown, CooldownTime;
 var bool bIronSightsOn;
 
 function IronSightsOn(){
+    PlayerViewOffset.X=500.000000;
+    PlayerViewOffset.Y=300.000000;
+    PlayerViewOffset.Z=-700.000000;
+	if(TMTPlayer(Owner) != None){
+        TMTPlayer(Owner).bCrosshairVisible = False;
+
+        DeusExRootWindow(TMTPlayer(Owner).rootWindow).UpdateHud();
+        TMTPlayer(Owner).GroundSpeed /= 2;
+	}
+    Level.Game.SetGameSpeed(0.2);
+	Level.Game.SaveConfig(); 
+
+    BaseAccuracy = 0.0;
     bIronSightsOn = True;
+
 }
 
 function IronSightsOff(){
+    TMTPlayer(Owner).bCrosshairVisible = True;
+
+    DeusExRootWindow(TMTPlayer(Owner).rootWindow).UpdateHud();
+    PlayerViewOffset = Default.PlayerViewOffset * 100;
+    TMTPlayer(Owner).ChangeSetHand("right");
+    //TMTPlayer(Owner).extHUD.ironSight.DeactivateView();
+    TMTPlayer(Owner).GroundSpeed = TMTPlayer(Owner).default.GroundSpeed;
+    BaseAccuracy = Default.BaseAccuracy;
+    Level.Game.SetGameSpeed(1);
+	Level.Game.SaveConfig(); 
     bIronSightsOn = False;
 }
 
 function ToggleIronSights(){
     if(bIronSightsOn) IronSightsOff();
     else IronSightsOn();
+}
+
+function ScopeOn()
+{
+	
+    super.ScopeOn();
+    bZoomed = False;
+}
+
+function ScopeOff()
+{
+	super.ScopeOff();
+    bZoomed = False;
+}
+
+simulated function ScopeToggle()
+{
+	super.ScopeToggle();
 }
 
 function MutTM WorldMutator(){
@@ -37,7 +79,9 @@ simulated function RenderOverlays(canvas Canvas){
 	local float			fromX, toX;
 	local float			fromY, toY;
 	local float			scopeWidth, scopeHeight;
-    
+    local string str;
+	local float mod;
+
     scopeWidth  = 256;
 	scopeHeight = 256;
 
@@ -68,10 +112,17 @@ simulated function RenderOverlays(canvas Canvas){
             y += 20;
         }
     }
-
-    if(bIronSightsOn){
-		Canvas.DrawPattern(Texture'isightglock', 0.5 * Canvas.ClipX - 16 * Scale, 0.5 * Canvas.ClipY - 16 * Scale, Scale);
-    }
+    Canvas.SetPos(0.5 * Canvas.ClipX - 16 * Scale, y);
+    //if(bIronSightsOn){
+		str = "ACCURACY "$Int((2.0 - Default.BaseAccuracy)*50.0) $ "%";
+		mod = (Default.BaseAccuracy - (BaseAccuracy + GetWeaponSkill())) * 0.5;
+		if (mod != 0.0)	{
+			str = str @ BuildPercentString(mod);
+			str = str @ "=" @ Min(100, Int(100.0*mod+(2.0 - Default.BaseAccuracy)*50.0)) $ "%";
+		}
+        str = str$"_";
+        Canvas.DrawText("        > "$str);
+    //}
 }
 
 function bool isHostile(ScriptedPawn sp){
@@ -285,13 +336,16 @@ function ExecShout(){
     hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
     hitpawn        = ScriptedPawn(hitactor);
 
+    player.ClientMessage("Checking target.");
     if(hitpawn != None && isTaunt(hitpawn)){
+        player.ClientMessage("Starting conversation....");
         player.flagBase.setBool('target_shouted', True, True);
         //player.StartConversationByName(Name(hitpawn.BindName$"gunpoint"), hitpawn);
         hitpawn.Frob(Player, Player.InHand);
+        player.StartConversation(hitpawn, IM_Frob);
         return;
     }
-
+    player.ClientMessage("Target passed, moving to standard shout.");
     if(cooldown > 0.0) return;
     cooldown = cooldowntime;
     ExploFX();
