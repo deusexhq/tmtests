@@ -8,7 +8,7 @@ event InitWindow()
 {
 	Super.InitWindow();
 	SetSize(370, 430);
-	SetTitle("TMT");
+	SetTitle("Ability Selection");
 
 	CreateControls();
 	PopulateList();

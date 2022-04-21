@@ -1,18 +1,18 @@
-class TMTWinHijack expands MenuUIScreenWindow;
+class TMTWinAbilitySelect expands MenuUIScreenWindow;
 
-//var ToolButtonWindow	btnBack;    
-var MenuUIActionButtonWindow 	btnDowngradeRange, btnUpgradeRange;
-var Hijack 						current;
+ 
+var MenuUIActionButtonWindow 	btnSelect1, btnSelect2;
 var MenuUILabelWindow			rangeDisplay;
+var TMTPlayer tPlayer;
 
 event InitWindow(){
 	local window w;
 
 	Super.InitWindow();
 	SetSize(400, 250);
-	SetTitle("Hijack");
+	SetTitle("Ability Select");
 
-
+	tPlayer = TMTPlayer(GetRootWindow().parentPawn);
 	StyleChanged();
 		
 	winClient.SetBackground(Texture'DeusExUI.MaskTexture');
@@ -24,7 +24,7 @@ event InitWindow(){
 	W.SetBackgroundStyle(DSTY_Modulated);
 	W.Lower();
 	
-	//CreateControls();
+	CreateAbilityButtons();
 	//Show();
 }
 
@@ -33,8 +33,7 @@ event DestroyWindow(){
 	//Log("Hijack dist "$inputDistLimit.GetText());
 }
 
-function CreateControls(){
-	Super.CreateControls();
+function CreateAbilityButtons(){
     //btnBack  = CreateToolButton(20, 65, "Open");
 	btnUpgradeRange = MenuUIActionButtonWindow(winClient.NewChild(Class'MenuUIActionButtonWindow'));
 	btnUpgradeRange.SetButtonText("+ Range");
@@ -46,7 +45,7 @@ function CreateControls(){
 	btnDowngradeRange.SetPos(20, 40);
 	btnDowngradeRange.SetWidth(100);
 
-	rangeDisplay = CreateMenuLabel(240, 40, "R "$current.distLimit, winClient);
+	rangeDisplay = CreateMenuLabel(240, 40, "R "$TMTPlayer(player).hijackDistLimit, winClient);
 	Show();	
 }
 

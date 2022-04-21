@@ -8,21 +8,24 @@ Add ground shake for player when rocket hits if within a var range
 Sound effects for when drone fires
 
  */
-var() int maxRange, Ammo, maxAmmo;
-var() Marker MyMarker; 
-var() float CountdownToFire, FiresIn;
-var() bool bCanTargetTerrain, bCanTargetNPC;
-var bool bWaitingToFire;
-var Pawn Target;
-var Vector TargetLocation;
+
+var() int strikeDistLimit, Ammo, maxAmmo;
+var() Marker strikeMarker; 
+var() float CountdownToFireStrike, StrikeFiresIn;
+var() bool bStrikeCanTargetTerrain, bStrikeCanTargetNPC;
+var bool bWaitingToFireStrike;
+var Pawn StrikeTarget;
+var Vector StrikeTargetLocation;
 
 function Tick(float deltatime){
     super.Tick(deltatime);
-    if(DeusExPlayer(Owner) != None && bWaitingToFire) {
-        CountdownToFire -= deltatime;
-        if (CountdownToFire < 0.0){
-            bWaitingToFire = False;
-            FireOnTarget();
+    if(DeusExPlayer(Owner) != None && bWaitingToFireStrike) {
+        CountdownToFireStrike -= deltatime;
+        if (CountdownToFireStrike < 0.0){
+            bWaitingToFireStrike = False;
+
+            if(StrikeTarget != None) FireOnTarget();
+            else FireOnLoc();
         }
     }
 }
@@ -44,8 +47,8 @@ simulated function RenderOverlays(canvas Canvas){
     Canvas.DrawText("        > AMMO "$Ammo$"_");
 
     Canvas.SetPos(0.5 * Canvas.ClipX - 16 * Scale, 0.5 * Canvas.ClipY - 16 * Scale + 20 );
-    if(MyMarker != None) {
-        if(bWaitingToFire) Canvas.DrawText("        > LAUNCHING IN "$CountdownToFire$"_");
+    if(strikeMarker != None) {
+        if(bWaitingToFireStrike) Canvas.DrawText("        > LAUNCHING IN "$CountdownToFireStrike$"_");
         else Canvas.DrawText("        > CONNECTED // READY_");
     } else Canvas.DrawText("        > NO CONNECTION, TRY AGAIN_");
 }
@@ -79,40 +82,42 @@ state Activated
         dist           = Abs(VSize(HitLocation - player.Location));
         hitpawn        = ScriptedPawn(hitactor);
 
-        if(bWaitingToFire){
+        if(bWaitingToFireStrike){
             player.ClientMessage("|P2System busy.");
             GotoState('DeActivated');
             return;   
         }
 
-        if(Ammo == 0) {
-            player.ClientMessage("|P2Strike bay is out of missiles.");
-            GotoState('DeActivated');
-            return;
-        }
-
-        if(MyMarker == None){
+        if(strikeMarker == None){
             player.ClientMessage("Scanning for available strike markers...");
             foreach AllActors(class'Marker', mc){
                 player.ClientMessage("Connection established.");
-                MyMarker = mc;
+                strikeMarker = mc;
             }
         }
 
-        if(MyMarker == None){
+        if(strikeMarker == None){
             player.ClientMessage("|P2No marker in range. Strike unavailable.");
             GotoState('DeActivated');
             return;
         }
 
-        if(hitpawn == None && dist < maxRange && bCanTargetTerrain){
-
+        if(strikeMarker.Ammo == 0) {
+            player.ClientMessage("|P2Strike bay is out of missiles.");
+            GotoState('DeActivated');
+            return;
         }
-        if(hitpawn != None && dist < maxRange && bCanTargetNPC){
-            Target = hitpawn;
+
+        if(hitpawn == None && dist < strikeDistLimit && bStrikeCanTargetTerrain){
+            striketargetLocation = hitLocation;
+            CountdownToFireStrike = StrikeFiresIn;
+            bWaitingToFireStrike = True;
+        }
+        if(hitpawn != None && dist < strikeDistLimit && bStrikeCanTargetNPC){
+            StrikeTarget = hitpawn;
             player.ClientMessage("Target found. Preparing.");
-            CountdownToFire = FiresIn;
-            bWaitingToFire = True;
+            CountdownToFireStrike = StrikeFiresIn;
+            bWaitingToFireStrike = True;
 		}
           
         // De-activate self so we can be re-used infinitely
@@ -127,10 +132,10 @@ function FireOnLoc(){
 
     DeusExPlayer(Owner).ClientMessage("Launched missile.");
 
-    launchRot = Rotator(TargetLocation - MyMarker.Location);  
-    rd = Spawn(MyMarker.StrikeProjectileClass, DeusExPlayer(Owner),,MyMarker.Location,launchRot);
+    launchRot = Rotator(StrikeTargetLocation - strikeMarker.Location);  
+    rd = Spawn(strikeMarker.StrikeProjectileClass, DeusExPlayer(Owner),,strikeMarker.Location,launchRot);
     
-    Ammo -= 1;
+    strikeMarker.Ammo -= 1;
 }
 
 function FireOnTarget(){
@@ -139,22 +144,22 @@ function FireOnTarget(){
 
     DeusExPlayer(Owner).ClientMessage("Launched missile.");
 
-    launchRot = Rotator(Target.Location - MyMarker.Location);  
-    rd = Spawn(MyMarker.StrikeProjectileClass, DeusExPlayer(Owner),,MyMarker.Location,launchRot);
+    launchRot = Rotator(StrikeTarget.Location - strikeMarker.Location);  
+    rd = Spawn(strikeMarker.StrikeProjectileClass, DeusExPlayer(Owner),,strikeMarker.Location,launchRot);
 
-    if(rd.isA('RocketDrone')) RocketDrone(rd).Itarget = Target;
+    if(rd.isA('RocketDrone')) RocketDrone(rd).Itarget = StrikeTarget;
     
-    Ammo -= 1;
+    strikeMarker.Ammo -= 1;
 }
 
 defaultproperties
 {
-     bCanTargetNPC=True
-     bCanTargetTerrain=True
+     strikeDistLimit=1024
+     StrikeFiresIn=15.0
+     bStrikeCanTargetNPC=True
+     bStrikeCanTargetTerrain=True
      maxAmmo=1000
      Ammo=1000
-     maxRange=1024
-     FiresIn=15.0
      bBreakable=False
      maxCopies=1
      bActivatable=True

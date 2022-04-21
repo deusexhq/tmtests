@@ -250,7 +250,7 @@ function Tick(float dt){
     local Vector        hitLocation, hitNormal, position, line;
     local float         dist;
     local int i;
-
+    
     if(cooldown > 0.0) cooldown -= dt;
 
     player         = DeusExPlayer(Owner);

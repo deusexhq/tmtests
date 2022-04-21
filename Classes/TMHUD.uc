@@ -1,6 +1,6 @@
 class TMHUD expands DeusExHUD;
 
-var IronSightView ironSight;
+var TextWindow wintm;
 var TMTPlayer tmtp;
 
 event InitWindow()
@@ -20,17 +20,44 @@ event InitWindow()
 	SetFont(Font'TechMedium');
 	SetSensitivity(false);
 
-	ironSight = IronSightView(NewChild(Class'IronSightView', False));
-    ironSight.SetWindowAlignments(HALIGN_Full, VALIGN_Full, 0, 0);
+	wintm = TextWindow(NewChild(Class'TextWindow'));
+	wintm.SetWindowAlignments(HALIGN_Right,VALIGN_Center,,128);
+	wintm.SetFont(Font'TechMedium');
+	wintm.Show(True);
+
 	bTickEnabled = True;
 }
 
 event DescendantRemoved(Window descendant)
 {
-	if (descendant == ironSight)
-		ironSight = None;
+	if (descendant == wintm)
+		wintm = None;
 	else
 		Super.DescendantRemoved(descendant);
+}
+
+function tick(float deltaTime)
+{
+	local DeusExRootWindow root;
+	local string str;
+	
+	root = DeusExRootWindow(GetRootWindow());
+	str = "";
+	if(wintm != None && tmtp != None){
+		if(tmtp.hijackcooldowntime > 0)
+			str = str@"HJCK="$tmtp.hijackcooldowntime;
+		if(tmtp.CountdownToFireStrike > 0)
+			str = str@"STRK="$tmtp.CountdownToFireStrike;
+		if(tmtp.bHeartScanning)
+			str = str@"SCAN="$tmtp.CurrentHeartscanTime;
+		if(tmtp.bJacked){
+			str = str@"CONTROL="$tmtp.jackedPawn.FamiliarName;
+			str = str@"DIST="$tmtp.curDist$"/"$tmtp.hijackDistLimit;
+			str = str@"TIME="$tmtp.hijackTimeLimit-tmtp.jackTime;
+		}
+
+		wintm.SetText(str);
+	}
 }
 
 defaultproperties

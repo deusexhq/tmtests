@@ -28,7 +28,7 @@ function Frob(Actor Frobber, Inventory frobWith){
       //mWin = TMTWin(root.InvokeUIScreen(Class'TMTWin', True));
       if(Player.InHand.isA('Hijack')){
          mWin = TMTWinHijack(root.InvokeUIScreen(Class'TMTWinHijack', True));
-         mWin.current = Hijack(Player.InHand);
+         //mWin.current = Hijack(Player.InHand);
          mWin.createControls();
       }
 

@@ -3,11 +3,96 @@ class TMTPlayer extends JCDentonMale;
 var bool bAlreadyJumped, IsMantling, bDisableFallDamage;
 var int MantleVelocity, WallJumpCheck, FallDamageReduction;
 var float WallJumpVelocity, DoubleJumpMultiplier, WallJumpZVelocity;
-//var TMHUD extHUD;
-//
+var TMHUD extHUD;
+var name Ability1Name, Ability2Name;
 
+var() bool bCanUseHijack, bCanUseStrike, bCanUseBullettime, bCanUseHeartscan;
 
-/*event Possess(){
+// Hijack
+var bool bJacked, bSwitchedAlliance;
+var JCDouble hijackHost;
+var ScriptedPawn jackedPawn;
+var() int hijackDistLimit;
+var() float hijackTimeLimit, hijackCooldown;
+var float jackTime;
+var int curDist;
+var float hijackcooldowntime;
+
+// Strike
+var() int strikeDistLimit;
+var() Marker strikeMarker; 
+var() float CountdownToFireStrike, StrikeFiresIn;
+var() bool bStrikeCanTargetTerrain, bStrikeCanTargetNPC;
+var bool bWaitingToFireStrike;
+var ScriptedPawn StrikeTarget;
+var Vector StrikeTargetLocation;
+
+// Bullettime
+var bool bBulletTimeOn;
+var() float BulletTimeSpeed;
+
+// Heartscan
+var() int heartscanMaxDist;
+var float HeartscanDelay, CurrentHeartscanTime;
+var bool bHeartScanning;
+var ScriptedPawn HeartscanTarget;
+
+// Summon Bot
+var Marker2 botSpawnMarker;
+
+function MultiplayerTick(float deltatime){
+	local scriptedpawn  hitpawn;
+	local Actor         hitActor;
+	local Vector        hitLocation, hitNormal, position, line;
+	local float         dist;
+	local rotator       playerRot;
+
+	if(bHeartScanning){
+		position       = Location;
+		position.Z     += BaseEyeHeight;
+		line           = Vector(ViewRotation) * 4000;
+		hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+		dist           = Abs(VSize(HitLocation - Location));
+		hitPawn 	   = ScriptedPawn(HitActor);
+		if(hitPawn == None || hitPawn != HeartscanTarget || dist > heartscanMaxDist) {
+			ClientMessage("Target lost.");
+			bHeartScanning = False;
+		} else {
+			CurrentHeartscanTime -= deltatime;
+			if(CurrentHeartscanTime < 0.0){
+				ClientMessage("Scan complete.");
+				AddNote("=== SCAN RESULT (Heartscan V1) ===|nName: "$HeartscanTarget.FamiliarName);
+				bHeartScanning = False;
+				HeartscanTarget = None;
+			}
+		}
+	}
+
+	if(hijackcooldowntime > 0.0) hijackcooldowntime -= deltatime;
+
+	if(bJacked) {
+		jackTime += deltatime;
+		if (jackTime >= hijackTimeLimit) Hijack();
+
+		curDist = Abs(VSize(jackedPawn.Location - Location));
+		if(curDist > hijackDistLimit) Hijack();
+	}
+	
+	if(bWaitingToFireStrike) {
+		CountdownToFireStrike -= deltatime;
+		if (CountdownToFireStrike < 0.0){
+			bWaitingToFireStrike = False;
+
+			if(StrikeTarget != None) StrikeFireOnTarget();
+			else StrikeFireOnLoc();
+		}
+		
+	}
+	super.Tick(deltatime);
+	super.MultiplayerTick(deltatime);
+}
+
+event Possess(){
     local DeusExRootWindow w;
 
     Super.Possess();
@@ -19,40 +104,267 @@ var float WallJumpVelocity, DoubleJumpMultiplier, WallJumpZVelocity;
 			w.hud.Destroy();
 		}
 		w.hud = TMHUD(w.NewChild(Class'TMHUD'));
-		extHUD = TMHUD(w.hud);
+		//extHUD = w.hud;
 		w.hud.UpdateSettings(self);
 		w.hud.SetWindowAlignments(HALIGN_Full,VALIGN_Full,0.00,0.00);
 		
 	}
 
-}*/
+}
 
+function ExecAbility(name AbilityName){
+	ClientMessage("Executing"@abilityName);
+	if(AbilityName == 'hijack'){
+		Hijack();
+	}
+	if(AbilityName == 'strike'){
+		Strike();
+	}
+	if(AbilityName == 'bullettime'){
+		Bullettime();
+	}
+	if(AbilityName == 'pulse'){
+		//Call Pulse
+	}
+	if(AbilityName == 'bot'){
+		SummonBot();
+	}
+	if(AbilityName == 'heartscan'){
+		Heartscan();
+	}
+}
+
+function SetAbilityName(int slot, name newAbilityName){
+	if(slot == 1) Ability1Name = newAbilityName;
+	if(slot == 2) Ability2Name = newAbilityName;
+}
 //
 // Commands
 //
-exec function pp(){
-	ClientMessage(DeusExWeapon(inHand).PlayerViewOffset);
-}
-exec function px(float x){
-	DeusExWeapon(inHand).PlayerViewOffset.X=x;
-}
-exec function py(float y){
-    DeusExWeapon(inHand).PlayerViewOffset.Y=y;
-}
-exec function pz(float z){
-    DeusExWeapon(inHand).PlayerViewOffset.Z=z;
-}
-exec function tmt(){
-    ClientMessage("Test!");
+
+exec function SummonBot(){
+	local Marker2 mc;
+
+	if(botSpawnMarker == None){
+		ClientMessage("Scanning for available markers...");
+		foreach AllActors(class'Marker2', mc){
+			ClientMessage("Connection established.");
+			botSpawnMarker = mc;
+		}
+	}
+
+	if(botSpawnMarker == None){
+		ClientMessage("|P2No marker in range. Summon unavailable.");
+		return;
+	}
+
+	botSpawnMarker.DoSpawn();
 }
 
-exec function msgr(string text){
-	ShowMessage(text);
+exec function Heartscan(){
+	local Actor         hitActor;
+	local Vector        hitLocation, hitNormal, position, line;
+	local float         dist;
+
+	position       = Location;
+	position.Z     += BaseEyeHeight;
+	line           = Vector(ViewRotation) * 4000;
+	hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+	dist           = Abs(VSize(HitLocation - Location));
+	
+
+	if(!bHeartScanning && dist < heartscanMaxDist){
+		HeartscanTarget= ScriptedPawn(hitactor);
+		CurrentHeartscanTime = HeartscanDelay;
+		bHeartScanning = True;
+		ClientMessage("Scanning target....");
+	} else ClientMessage("No target found.");
+
 }
 
-exec function bark(string text){
-	CreateBark(self, text, 5.0);
+exec function Bullettime(){
+	if(bBulletTimeOn){
+		Level.Game.SetGameSpeed(1);
+		Level.Game.SaveConfig(); 
+		bBulletTimeOn = False;
+	} else {
+		Level.Game.SetGameSpeed(BulletTimeSpeed);
+		Level.Game.SaveConfig(); 
+		bBulletTimeOn = True;
+	}
 }
+
+exec function Hijack(){
+	local MutTM tm;
+	local scriptedpawn  hitpawn;
+	local Actor         hitActor;
+	local Vector        hitLocation, hitNormal, position, line;
+	local float         dist;
+	local rotator       playerRot;
+
+	if(hijackcooldowntime > 0.0) {
+		ClientMessage("|P2System on cooldown.");
+		return;
+	}
+
+	tm = WorldMutator();
+
+	if(bJacked){
+		// Effects
+		SetInHand(None);
+		ClientFlash(2, vect(0,255,0));
+		//player.Sprite = None;
+		//player.ConsoleCommand("RMODE 5");
+		jackedPawn.bHidden = False;
+
+		// Copy player's skin back to the jacked pawn
+		tm.grabSkin(self, jackedPawn);
+		// Copy host skin back to the player
+		tm.grabSkin(hijackHost, self);
+
+		// Move the players inventory back to the jacked pawn
+		tm.grabInventory(self, jackedPawn);
+
+		// Move the hosts inventory back to the player
+		tm.grabInventory(hijackHost, self);
+		
+		jackedPawn.SetLocation(Location);
+		SetLocation(hijackHost.location);
+		
+		// Cleanup
+		bJacked = False;
+		jackedPawn.SetPhysics(PHYS_Falling);
+		jackedPawn.SetCollision(True, True, True);
+		jackedPawn = None;
+		hijackHost.destroy();
+
+		hijackcooldowntime = hijackCooldown;
+		if(bSwitchedAlliance) {
+			bSwitchedAlliance = False;
+			tm.switchGlobalAlliances();
+		}
+	} else {
+		// Tracing and finding target
+		position       = Location;
+		position.Z     += BaseEyeHeight;
+		line           = Vector(ViewRotation) * 4000;
+		hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+		dist           = Abs(VSize(HitLocation - Location));
+		hitpawn        = ScriptedPawn(hitactor);
+
+		// Pawn found and within range
+		if(hitpawn != None && dist < hijackDistLimit && !hitpawn.isA('Animal') && !hitpawn.isA('Robot')) {
+				// Effects and generic setup
+				ClientFlash(2, vect(0,255,0));
+				SetInHand(None);
+				//player.Sprite=Texture(DynamicLoadObject("Extras.Matrix_A00",class'Texture'));
+				//player.ConsoleCommand("RMODE 6");
+				jackedPawn = hitpawn;
+				bJacked = True;
+				jackTime = 0.0;
+
+				
+
+				// Spawning a host to store player data
+				// Turning off player collision here so an NPC can spawn on them
+				SetCollision(False, False, False);
+				playerRot = ViewRotation;
+				playerRot.pitch = 0;
+				hijackHost = Spawn(class'JCDouble', self, 'Jacker', Location, playerRot);
+				hijackHost.orders = 'standing';
+				SetLocation(hitpawn.location);
+				SetRotation(hitpawn.ViewRotation);
+				SetCollision(True, True, True);
+				
+
+				// Storing player skin on the host
+				tm.grabSkin(self, hijackHost);
+				// Copying target skin to the player
+				tm.grabSkin(hitpawn, self);
+
+				// Moving players inventory to the host for storage
+				tm.grabInventory(self, hijackHost);
+				// Moving targets inventory to player for usage
+				tm.grabInventory(hitpawn, self);
+
+				// Hiding the real target from the world
+				hitpawn.SetPhysics(PHYS_None);
+				hitPawn.SetCollision(False, False, False);
+				hitpawn.bHidden = True;
+
+				// If enemy is a hostile, switch everyones alliances
+				if(tm.isHostile(hitpawn)){
+					tm.switchGlobalAlliances();
+					bSwitchedAlliance = True; 
+				}
+			}
+		}
+}
+
+exec function Strike(){
+	local scriptedpawn  hitpawn;
+	local Actor         hitActor;
+	local Vector        hitLocation, hitNormal, position, line;
+	local float         dist;
+	local marker        mc;
+
+	position       = Location;
+	position.Z     += BaseEyeHeight;
+	line           = Vector(ViewRotation) * 4000;
+	hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+	dist           = Abs(VSize(HitLocation - Location));
+	hitpawn        = ScriptedPawn(hitactor);
+
+	if(bWaitingToFireStrike){
+		ClientMessage("|P2System busy.");
+		return;   
+	}
+
+	if(strikeMarker == None){
+		ClientMessage("Scanning for available strike markers...");
+		foreach AllActors(class'Marker', mc){
+			ClientMessage("Connection established.");
+			strikeMarker = mc;
+		}
+	}
+
+	if(strikeMarker == None){
+		ClientMessage("|P2No marker in range. Strike unavailable.");
+		return;
+	}
+
+	if(strikeMarker.MyAmmo == 0) {
+		ClientMessage("|P2Strike bay is out of missiles.");
+		return;
+	}
+
+	if(hitpawn == None && dist < strikeDistLimit && bStrikeCanTargetTerrain){
+		striketargetLocation = hitLocation;
+		CountdownToFireStrike = StrikeFiresIn;
+		bWaitingToFireStrike = True;
+	}
+	
+	if(hitpawn != None && dist < strikeDistLimit && bStrikeCanTargetNPC){
+		StrikeTarget = hitpawn;
+		ClientMessage("Target found. Preparing.");
+		CountdownToFireStrike = StrikeFiresIn;
+		bWaitingToFireStrike = True;
+	}
+}
+
+exec function AbilityName1(name abilityName){ Ability1Name = abilityName; }
+exec function AbilityName2(name abilityName){ Ability2Name = abilityName; }
+exec function Ability1(){ ExecAbility(Ability1Name); }
+exec function Ability2(){ ExecAbility(Ability2Name); }
+
+exec function pp(){	ClientMessage(DeusExWeapon(inHand).PlayerViewOffset); }
+exec function px(float x){DeusExWeapon(inHand).PlayerViewOffset.X=x; }
+exec function py(float y){ DeusExWeapon(inHand).PlayerViewOffset.Y=y; }
+exec function pz(float z){ DeusExWeapon(inHand).PlayerViewOffset.Z=z; }
+
+exec function tmt(){ ClientMessage("Test!");}
+exec function msgr(string text){ ShowMessage(text); }
+exec function bark(string text){ CreateBark(self, text, 5.0); }
 
 exec function toggleironsights(){
 	local TMTWeapon T;
@@ -304,8 +616,54 @@ function Landed(vector HitNormal){
 	bJustLanded = true;
 }
 
+function MutTM WorldMutator(){
+    local MutTM M;
+    foreach AllActors(class'MutTM', M) return M;
+    return Spawn(class'MutTM');
+}
+
+function StrikeFireOnLoc(){
+    local rotator            launchRot;
+    local DeusExProjectile   rd;
+
+    ClientMessage("Launched missile.");
+
+    launchRot = Rotator(StrikeTargetLocation - strikeMarker.Location);  
+    rd = Spawn(strikeMarker.StrikeProjectileClass, self,,strikeMarker.Location,launchRot);
+    
+    strikeMarker.MyAmmo -= 1;
+}
+
+function StrikeFireOnTarget(){
+    local rotator            launchRot;
+    local DeusExProjectile   rd;
+
+    ClientMessage("Launched missile.");
+
+    launchRot = Rotator(StrikeTarget.Location - strikeMarker.Location);  
+    rd = Spawn(strikeMarker.StrikeProjectileClass, self,,strikeMarker.Location,launchRot);
+
+    if(rd.isA('RocketDrone')) RocketDrone(rd).Itarget = StrikeTarget;
+    
+    strikeMarker.MyAmmo -= 1;
+}
+
 defaultproperties
 {
+	heartscanMaxDist=1024
+	HeartscanDelay=10.0
+	bCanUseHijack=True
+	bCanUseStrike=True
+	bCanUseBullettime=True
+	bCanUseHeartscan=True
+	BulletTimeSpeed=0.2
+	strikeDistLimit=1024
+	StrikeFiresIn=15.0
+	bStrikeCanTargetNPC=True
+	bStrikeCanTargetTerrain=True
+	hijackCooldown=15.0
+    hijackDistLimit=1024
+    hijackTimeLimit=60.0
     MantleVelocity=600
     WallJumpVelocity=512.000000
     DoubleJumpMultiplier=1.200000
