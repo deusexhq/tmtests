@@ -1,4 +1,4 @@
-class AmmoSting extends DeusExAmmo;
+class AmmoGrapple extends DeusExAmmo;
 
 simulated function PreBeginPlay()
 {
@@ -6,15 +6,15 @@ simulated function PreBeginPlay()
 
 	// If this is a netgame, then override defaults
 	if ( Level.NetMode != NM_StandAlone )
-      AmmoAmount = 6;
+      AmmoAmount = 1;
 }
 
 defaultproperties
 {
-     bShowInfo=True
-     AmmoAmount=10
-     MaxAmmo=60
-     ItemName="Stingers"
+     bShowInfo=False
+     AmmoAmount=11
+     MaxAmmo=1
+     ItemName="Rope Dart"
      ItemArticle="some"
      PickupViewMesh=LodMesh'DeusExItems.AmmoDart'
      LandSound=Sound'DeusExSounds.Generic.PaperHit2'
@@ -23,7 +23,7 @@ defaultproperties
      largeIconWidth=20
      largeIconHeight=47
      Description="The mini-crossbow dart is a favored weapon for many 'wet' operations; however, silent kills require a high degree of skill."
-     beltDescription="STING"
+     beltDescription="ROPE"
      Mesh=LodMesh'DeusExItems.AmmoDart'
      CollisionRadius=8.500000
      CollisionHeight=2.000000

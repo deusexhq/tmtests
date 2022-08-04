@@ -1,28 +1,35 @@
 class TMTPlayer extends JCDentonMale;
 
+// Core
+var TMHUD extHUD;
+var travel Inventory OriginalHeld, SideArm, ReadyGrenade;
+
+// Mantling
 var bool bAlreadyJumped, IsMantling, bDisableFallDamage;
 var int MantleVelocity, WallJumpCheck, FallDamageReduction;
 var float WallJumpVelocity, DoubleJumpMultiplier, WallJumpZVelocity;
-var TMHUD extHUD;
-var name Ability1Name, Ability2Name;
 
-var() bool bCanUseHijack, bCanUseStrike, bCanUseBullettime, bCanUseHeartscan;
+// Ability management
+var() travel name Ability1Name, Ability2Name;
+var() travel bool bCanUseHijack, bCanUseStrike, bCanUseBullettime, bCanUseHeartscan;
 
 // Hijack
+var() travel bool bCanHijackNPC, bCanHijackBot, bCanSuicideBot;
 var bool bJacked, bSwitchedAlliance;
 var JCDouble hijackHost;
 var ScriptedPawn jackedPawn;
-var() int hijackDistLimit;
-var() float hijackTimeLimit, hijackCooldown;
+var() travel int hijackDistLimit;
+var() travel float hijackTimeLimit, hijackCooldown;
 var float jackTime;
 var int curDist;
 var float hijackcooldowntime;
+var bool bHijackingComputers;
 
 // Strike
-var() int strikeDistLimit;
+var() travel int strikeDistLimit;
 var() Marker strikeMarker; 
-var() float CountdownToFireStrike, StrikeFiresIn;
-var() bool bStrikeCanTargetTerrain, bStrikeCanTargetNPC;
+var() travel float CountdownToFireStrike, StrikeFiresIn;
+var() travel bool bStrikeCanTargetTerrain, bStrikeCanTargetNPC;
 var bool bWaitingToFireStrike;
 var ScriptedPawn StrikeTarget;
 var Vector StrikeTargetLocation;
@@ -32,13 +39,267 @@ var bool bBulletTimeOn;
 var() float BulletTimeSpeed;
 
 // Heartscan
-var() int heartscanMaxDist;
-var float HeartscanDelay, CurrentHeartscanTime;
+var() travel int heartscanMaxDist;
+var() travel float HeartscanDelay, CurrentHeartscanTime;
 var bool bHeartScanning;
 var ScriptedPawn HeartscanTarget;
 
 // Summon Bot
-var Marker2 botSpawnMarker;
+var() Marker2 botSpawnMarker;
+
+// Custom Drone system
+var bool bCustomDroneActive;
+var class<Spydrone> CustomDrone;
+
+exec function TestDrone(){
+	local Augmentation a;
+	CustomDrone = class'DroneExt';
+	a = AugmentationSystem.GivePlayerAugmentation(class'AugDrone');
+	a.CurrentLevel = 3;
+	AugDrone(a).ReconstructTime = 0;
+	//aa.Activate();
+	ClientMessage("Custom Drone Set.");
+	//DefaultDrone();
+}
+
+exec function SetDrone(string droneName){
+	local Augmentation a;
+	local class<DroneExt> d;
+	local string holdName;
+
+	if (instr(droneName, ".") == -1)
+		holdName = "TMTests." $ droneName;
+	else
+		holdName = "" $ droneName;  // barf
+
+	d = class<DroneExt>(DynamicLoadObject(holdName, class'Class'));
+	CustomDrone = d;
+	a = AugmentationSystem.GivePlayerAugmentation(class'AugDrone');
+	a.CurrentLevel = 3;
+	AugDrone(a).ReconstructTime = 0;
+	ClientMessage("Custom Drone Set: "$d);
+
+}
+
+exec function DefaultDrone(){ CustomDrone = class'Spydrone'; }
+
+exec function ddb(){
+	DroneDrop(class'Medkit');
+}
+
+function DroneDrop(class<Actor> a){
+	DroneExt(aDrone).bSpawnObjectOnDestroy = True;
+	DroneExt(aDrone).DeathSpawnClass = a;
+	aDrone.Destroy();
+	ForceDroneOff();
+}
+
+function CreateDrone(){
+	local Vector loc;
+
+	//TECHNO: Hooking some custom check so we can easily divert.
+	if(CustomDrone != class'Spydrone') bCustomDroneActive = True;
+
+	loc = (2.0 + CustomDrone.Default.CollisionRadius + CollisionRadius) * Vector(ViewRotation);
+	loc.Z = BaseEyeHeight;
+	loc += Location;
+	aDrone = Spawn(CustomDrone, Self,, loc, ViewRotation);
+	if (aDrone != None)	{
+		aDrone.Speed = 3 * spyDroneLevelValue;
+		aDrone.MaxSpeed = 3 * spyDroneLevelValue;
+		aDrone.Damage = 5 * spyDroneLevelValue;
+		aDrone.blastRadius = 8 * spyDroneLevelValue;
+	}
+	ClientMessage("Creating drone"@aDrone@bCustomDroneActive);
+}
+
+simulated function MoveDrone( float DeltaTime, Vector loc ){
+	//@todo - Override movement system for custom drones allowing for walkers
+
+	if (VSize(loc) == 0) {
+      aDrone.Velocity *= 0.9;
+   }
+	else   {
+      aDrone.Velocity += deltaTime * aDrone.MaxSpeed * loc;
+   }
+
+   if (Level.Netmode == NM_Standalone)	
+      aDrone.Velocity += deltaTime * Sin(Level.TimeSeconds * 2.0) * vect(0,0,1);
+}
+
+exec function ParseRightClick(){
+	super.ParseRightClick();
+	if (bSpyDroneActive){
+		if(bCustomDroneActive){
+			DroneExt(aDrone).OnRightClick();
+		}
+	}
+}
+
+exec function ParseLeftClick(){
+	if (RestrictInput())
+		return;
+
+	// if the spy drone augmentation is active, blow it up
+	// TECHNO: Except if its a custom drone, then do whatever the custom drone wants to do idk.
+	if (bSpyDroneActive){
+		if(bCustomDroneActive){
+			DroneExt(aDrone).OnClick();
+
+		} else {
+			DroneExplode();
+			return;
+		}
+	}
+
+	if ((inHand != None) && !bInHandTransition)
+	{
+		if (inHand.bActivatable)
+			inHand.Activate();
+		else if (FrobTarget != None)
+		{
+			// special case for using keys or lockpicks on doors
+			if (FrobTarget.IsA('DeusExMover'))
+				if (inHand.IsA('NanoKeyRing') || inHand.IsA('Lockpick'))
+					DoFrob(Self, inHand);
+
+			// special case for using multitools on hackable things
+			if (FrobTarget.IsA('HackableDevices'))
+			{
+				if (inHand.IsA('Multitool'))
+				{
+					if (( Level.Netmode != NM_Standalone ) && (TeamDMGame(DXGame) != None) && FrobTarget.IsA('AutoTurretGun') && (AutoTurretGun(FrobTarget).team==PlayerReplicationInfo.team) )
+					{
+						MultiplayerNotifyMsg( MPMSG_TeamHackTurret );
+						return;
+					}
+					else
+						DoFrob(Self, inHand);
+				}
+			}
+		}
+	}
+}
+
+
+function RegisterSideArm(Inventory i){
+	if(TMTWeapon(InHand) != None){
+		SideArm = i;
+		ClientMessage(SideArm);
+	}
+
+}
+
+function RegisterGrenade(Inventory i){
+	if(TMTWeapon(InHand) != None){
+		ReadyGrenade = i;
+		ClientMessage(ReadyGrenade);
+	}
+}
+exec function ReadyGrenadeInHand(){RegisterGrenade(InHand);}
+exec function SidearmInHand(){RegisterSideArm(InHand);}
+exec function rgi(){ReadyGrenadeInHand();}
+exec function sai(){SidearmInHand();}
+
+exec function FireSideArm(){
+	TMTWeapon(SideArm).AnimScale = 2000.0;
+	TMTWeapon(InHand).AnimScale = 2000.0;
+	OriginalHeld = InHand;
+	PutInHand(SideArm);
+}
+
+exec function EndFireSideArm(){
+	TMTWeapon(InHand).ForceFire();
+	PutInHand(OriginalHeld);
+	TMTWeapon(SideArm).AnimScale = 1.0;
+	TMTWeapon(OriginalHeld).AnimScale = 1.0;
+}
+
+exec function ThrowGrenade(){
+	TMTWeapon(ReadyGrenade).AnimScale = 2000.0;
+	TMTWeapon(InHand).AnimScale = 2000.0;
+	OriginalHeld = InHand;
+	PutInHand(ReadyGrenade);
+}
+
+exec function EndThrowGrenade(){
+	TMTWeapon(InHand).ForceFire();
+	PutInHand(OriginalHeld);
+	TMTWeapon(ReadyGrenade).AnimScale = 1.0;
+	TMTWeapon(OriginalHeld).AnimScale = 1.0;
+}
+
+exec function QuickMed(){
+	//local TMTMedkit mdk; //future proofing
+	local Medkit mdk;
+	mdk = Medkit(FindInventoryType(class'Medkit'));
+	if(mdk != None){
+		mdk.GotoState('Activated');
+	}
+
+}
+exec function QuickBio(){
+	//local TMTBiocell bioc; //future proofing
+	local BioelectricCell bioc;
+	bioc = BioelectricCell(FindInventoryType(class'BioelectricCell'));
+	if(bioc != None){
+		bioc.GotoState('Activated');
+	}
+}
+
+exec function QuickFood(){
+	local CandyBar cb;
+	local SoyFood sf;
+	local SodaCan sc;
+
+	cb = CandyBar(FindInventoryType(class'CandyBar'));
+	if(cb != None){
+		cb.GotoState('Activated');
+		return;
+	}
+
+	sf = SoyFood(FindInventoryType(class'SoyFood'));
+	if(sf != None){
+		sf.GotoState('Activated');
+		return;
+	}
+
+	sc = SodaCan(FindInventoryType(class'SodaCan'));
+	if(sc != None){
+		sc.GotoState('Activated');
+		return;
+	}
+}
+
+function RemoveSilencer(DeusExWeapon w){
+	local WeaponModSilencer wms;
+	
+	if(w != None){
+		wms = spawn(class'WeaponModSilencer',,,Location);
+		wms.Frob(Self, InHand);
+		wms.Destroy();
+		w.bHasSilencer = False;
+		ClientMessage("Silencer removed from "$w.ItemName);
+	}
+}
+function AddSilencer(DeusExWeapon w){
+	local WeaponModSilencer wms;
+
+	wms = WeaponModSilencer(FindInventoryType(class'WeaponModSilencer'));
+	if(wms != None && w != None){
+		wms.Destroy();
+		w.bHasSilencer = True;
+		ClientMessage("Silencer attached to "$w.ItemName);
+	}
+}
+
+exec function ToggleSilencer(){
+	if(DeusExWeapon(InHand).bHasSilencer){
+		RemoveSilencer(DeusExWeapon(InHand));
+	} else {
+		AddSilencer(DeusExWeapon(InHand));
+	}
+}
 
 function MultiplayerTick(float deltatime){
 	local scriptedpawn  hitpawn;
@@ -113,7 +374,6 @@ event Possess(){
 }
 
 function ExecAbility(name AbilityName){
-	ClientMessage("Executing"@abilityName);
 	if(AbilityName == 'hijack'){
 		Hijack();
 	}
@@ -194,6 +454,31 @@ exec function Bullettime(){
 	}
 }
 
+exec function tmtboost(){
+	bCanHijackBot=True;
+	bCanHijackNPC=True;
+	bCanUseBullettime=True;
+	bCanUseHeartscan=True;
+	bCanUseHijack=True;
+	bCanSuicideBot=True;
+	bStrikeCanTargetTerrain=True;
+	bStrikeCanTargetNPC=True;
+}
+
+exec function ExplodeHijack(){
+	local GenericExplosion genex;
+	local Pawn t;
+	if(!bCanSuicideBot){
+		ClientMessage("You aren't skilled enough to do this.");
+		return;
+	}
+	genex = spawn(class'GenericExplosion',,,location);
+	t = jackedPawn;
+	Hijack();
+	//t.TakeDamage(200,Self,vect(0,0,0),vect(0,0,1),'Special');	
+	genex.Explode();
+}
+
 exec function Hijack(){
 	local MutTM tm;
 	local scriptedpawn  hitpawn;
@@ -201,13 +486,31 @@ exec function Hijack(){
 	local Vector        hitLocation, hitNormal, position, line;
 	local float         dist;
 	local rotator       playerRot;
-
+	local Computers		comp;
 	if(hijackcooldowntime > 0.0) {
 		ClientMessage("|P2System on cooldown.");
 		return;
 	}
 
 	tm = WorldMutator();
+
+	position       = Location;
+	position.Z     += BaseEyeHeight;
+	line           = Vector(ViewRotation) * 4000;
+	hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
+	dist           = Abs(VSize(HitLocation - Location));
+
+	if(Computers(hitActor) != None){
+		//TODO swap to silent version
+		TMTSkillManager(SkillSystem).AddSkillClass(class'SkillComputer');
+		TMTSkillManager(SkillSystem).AddSkillClass(class'SkillComputer');
+		TMTSkillManager(SkillSystem).AddSkillClass(class'SkillComputer');
+		comp = Computers(hitActor);
+		ClientMessage("Hacking "$hitActor);
+		bHijackingComputers = True;
+		comp.Frob(Self, Self.inHand);
+		return;
+	}
 
 	if(bJacked){
 		// Effects
@@ -245,15 +548,11 @@ exec function Hijack(){
 		}
 	} else {
 		// Tracing and finding target
-		position       = Location;
-		position.Z     += BaseEyeHeight;
-		line           = Vector(ViewRotation) * 4000;
-		hitActor       = Trace(hitLocation, hitNormal, position+line, position, true);
-		dist           = Abs(VSize(HitLocation - Location));
+
 		hitpawn        = ScriptedPawn(hitactor);
 
 		// Pawn found and within range
-		if(hitpawn != None && dist < hijackDistLimit && !hitpawn.isA('Animal') && !hitpawn.isA('Robot')) {
+		if(hitpawn != None && dist < hijackDistLimit && bCanHijackNPC && !hitpawn.isA('Animal') && !hitpawn.isA('Robot')) {
 				// Effects and generic setup
 				ClientFlash(2, vect(0,255,0));
 				SetInHand(None);
@@ -453,6 +752,108 @@ simulated final function createBark(Actor BotSender, string msg, float Delay){
 //
 // Overrides
 //
+exec function Suicide()
+{
+	if(!bJacked){
+		KilledBy( None );
+	} else {
+		ExplodeHijack();
+	}
+}
+
+function InitializeSubSystems()
+{
+	// Spawn the BarkManager
+	if (BarkManager == None)
+		BarkManager = Spawn(class'BarkManager', Self);
+
+	// Spawn the Color Manager
+	CreateColorThemeManager();
+    ThemeManager.SetOwner(self);
+
+	// install the augmentation system if not found
+	if (AugmentationSystem == None)
+	{
+		AugmentationSystem = Spawn(class'AugmentationManager', Self);
+		AugmentationSystem.CreateAugmentations(Self);
+		AugmentationSystem.AddDefaultAugmentations();        
+        AugmentationSystem.SetOwner(Self);       
+	}
+	else
+	{
+		AugmentationSystem.SetPlayer(Self);
+        AugmentationSystem.SetOwner(Self);
+	}
+
+	// install the skill system if not found
+	// TMT: Inserting custom skill manager
+	if (SkillSystem == None || TMTSkillManager(SkillSystem) == None)
+	{
+		SkillSystem = Spawn(class'TMTSkillManager', Self);
+		SkillSystem.CreateSkills(Self);
+	}
+	else
+	{
+		SkillSystem.SetPlayer(Self);
+	}
+
+   if ((Level.Netmode == NM_Standalone) || (!bBeltIsMPInventory))
+   {
+      // Give the player a keyring
+      CreateKeyRing();
+   }
+}
+
+function InvokeComputerScreen(Computers computerToActivate, float CompHackTime, float ServerLevelTime)
+{
+   local NetworkTerminal termwindow;
+   local DeusExRootWindow root;
+
+   computerToActivate.LastHackTime = CompHackTime + (Level.TimeSeconds - ServerLevelTime);
+
+   ActiveComputer = ComputerToActivate;
+
+   //only allow for clients or standalone
+   if ((Level.NetMode != NM_Standalone) && (!PlayerIsClient())){
+      ActiveComputer = None;
+      CloseComputerScreen(computerToActivate);
+      return;
+   }
+
+   root = DeusExRootWindow(rootWindow);
+   if (root != None) {
+		termwindow = NetworkTerminal(root.InvokeUIScreen(computerToActivate.terminalType, True));
+		if (termwindow != None) {
+			computerToActivate.termwindow = termwindow;
+			termWindow.SetCompOwner(computerToActivate);
+
+			// If multiplayer, start hacking if there are no users
+			if ((Level.NetMode != NM_Standalone) && (!termWindow.bHacked) && (computerToActivate.NumUsers() == 0) && (termWindow.winHack != None) && (termWindow.winHack.btnHack != None))	{
+				termWindow.winHack.StartHack();
+				termWindow.winHack.btnHack.SetSensitivity(False);
+				termWindow.FirstScreen=None;
+			}
+
+			//TMT: If hijacking computers, start hacking
+			if(bHijackingComputers == True){
+				termWindow.winHack.StartHack();
+				termWindow.winHack.btnHack.SetSensitivity(False);
+				termWindow.FirstScreen=None;
+			}
+			termWindow.ShowFirstScreen();
+		}
+   }
+   if ((termWindow == None)  || (root == None)){
+      CloseComputerScreen(computerToActivate);
+      ActiveComputer = None;
+   }
+}
+
+function CloseComputerScreen(Computers computerToClose){
+	bHijackingComputers = False;
+	computerToClose.CloseOut();
+	TMTSkillManager(SkillSystem).ResetSingle(class'SkillComputer');
+}
 
 function DoJump( optional float F ){
 	local DeusExWeapon w;
@@ -650,6 +1051,7 @@ function StrikeFireOnTarget(){
 
 defaultproperties
 {
+	CustomDrone=class'Spydrone'
 	heartscanMaxDist=1024
 	HeartscanDelay=10.0
 	bCanUseHijack=True

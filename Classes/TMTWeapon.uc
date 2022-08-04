@@ -10,6 +10,23 @@ var string TauntInfo[16];
 var ScriptedPawn lastLookedAt;
 var() float Cooldown, CooldownTime;
 var bool bIronSightsOn;
+var float AnimScale;
+var bool bSkipAnims;
+
+simulated function TweenDown()
+{
+	if ( (AnimSequence != '') && (GetAnimGroup(AnimSequence) == 'Select') )
+		TweenAnim( AnimSequence, AnimFrame * 0.4 );
+	else{
+		if(!bSkipAnims) PlayAnim('Down', AnimScale, 0.05);
+	}
+}
+
+function PlaySelect()
+{
+	if(!bSkipAnims) PlayAnim('Select',AnimScale,0.0);
+	Owner.PlaySound(SelectSound, SLOT_Misc, Pawn(Owner).SoundDampening);	
+}
 
 function IronSightsOn(){
     PlayerViewOffset.X=500.000000;
@@ -361,6 +378,7 @@ function Altfire(float v){
 
 defaultproperties
 {
+    AnimScale=1.0
     shoutRadius=512
     tauntTimeout=2.0
     cooldownTime=10
